@@ -1,68 +1,95 @@
 import streamlit as st
 import time
 from openai import OpenAI
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
+from datetime import datetime
+import pytz
 
-# Initialize session state for login
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-
-def validate_sunet(sunet_id):
-    """
-    Validate SUNet ID format (you may want to add more validation rules)
-    """
-    # Basic validation: non-empty and follows general SUNet format
-    if not sunet_id:
-        return False
-    # Add more validation rules as needed
-    return True
-
-def login_page():
-    st.title("🎓 Stanford Course Helper Login")
-    st.markdown("Please enter your SUNet ID to access the course helper.")
-    
-    # Create login form
-    with st.form("login_form"):
-        sunet_id = st.text_input("SUNet ID").strip()
-        submitted = st.form_submit_button("Login")
-        
-        if submitted:
-            if validate_sunet(sunet_id):
-                st.session_state.authenticated = True
-                st.session_state.sunet_id = sunet_id
-                st.rerun()
-            else:
-                st.error("Invalid SUNet ID. Please try again.")
+# Google Sheets setup
+SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
 @st.cache_resource
-def initialize_assistant():
-    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-    assistant = client.beta.assistants.retrieve(st.secrets["ASSISTANT_KEY"])
-    thread = client.beta.threads.create()
-    return client, assistant, thread
+def get_google_sheets_service():
+    """Initialize Google Sheets service"""
+    credentials = Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"],
+        scopes=SCOPES
+    )
+    service = build('sheets', 'v4', credentials=credentials)
+    return service
 
+def log_interaction(service, spreadsheet_id, user_message, assistant_response, sunet_id):
+    """Log interaction to Google Sheets"""
+    # Get PST timezone
+    pst = pytz.timezone('America/Los_Angeles')
+    current_time = datetime.now(pst).strftime('%Y-%m-%d %H:%M:%S %Z')
+    
+    # Prepare the row data
+    row_data = [
+        [
+            current_time,
+            sunet_id,
+            user_message,
+            assistant_response,
+            len(user_message),  # Message length
+            len(assistant_response),  # Response length
+        ]
+    ]
+    
+    # Append the row to the sheet
+    body = {
+        'values': row_data
+    }
+    
+    service.spreadsheets().values().append(
+        spreadsheetId=spreadsheet_id,
+        range='Logs!A:F',  # Assumes sheet named 'Logs'
+        valueInputOption='RAW',
+        insertDataOption='INSERT_ROWS',
+        body=body
+    ).execute()
+
+def initialize_sheet_if_needed(service, spreadsheet_id):
+    """Initialize the sheet with headers if it's new"""
+    headers = [
+        ['Timestamp', 'SUNet ID', 'User Message', 'Assistant Response', 
+         'Message Length', 'Response Length']
+    ]
+    
+    try:
+        # Check if headers exist
+        result = service.spreadsheets().values().get(
+            spreadsheetId=spreadsheet_id,
+            range='Logs!A1:F1'
+        ).execute()
+        
+        if 'values' not in result:
+            # Sheet is empty, add headers
+            body = {
+                'values': headers
+            }
+            service.spreadsheets().values().update(
+                spreadsheetId=spreadsheet_id,
+                range='Logs!A1:F1',
+                valueInputOption='RAW',
+                body=body
+            ).execute()
+    except Exception as e:
+        print(f"Error checking/initializing sheet: {e}")
+
+# Modified main_app function
 def main_app():
     client, assistant, thread = initialize_assistant()
+    sheets_service = get_google_sheets_service()
+    spreadsheet_id = st.secrets["SPREADSHEET_ID"]
+    
+    # Initialize sheet if needed
+    initialize_sheet_if_needed(sheets_service, spreadsheet_id)
     
     st.title("🎓 Stanford Course Helper")
-    # Display welcome message with SUNet ID
-    st.markdown(f"""
-        Welcome to the Stanford Course Helper, {st.session_state.sunet_id}! I can help you:
-        - Check course prerequisites
-        - Recommend courses based on your interests
-        - Validate your course schedule
-        - Provide information about specific courses
-    """)
+    # Rest of your existing welcome message code...
     
-    # Create a chat interface
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-
-    # Display chat history
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    # Chat input
     if prompt := st.chat_input("Ask about courses..."):
         # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
@@ -103,31 +130,17 @@ def main_app():
                 response = messages.data[0].content[0].text.value
                 message_placeholder.markdown(response)
                 st.session_state.messages.append({"role": "assistant", "content": response})
+                
+                # Log the interaction to Google Sheets
+                try:
+                    log_interaction(
+                        sheets_service,
+                        spreadsheet_id,
+                        prompt,
+                        response,
+                        st.session_state.sunet_id
+                    )
+                except Exception as e:
+                    st.error(f"Failed to log interaction: {e}")
 
-    # Add sidebar with helpful information
-    with st.sidebar:
-        st.header("Tips for using the Course Helper")
-        st.markdown("""
-        - Ask about specific courses by their course codes (e.g., CS106B)
-        - Check if your schedule is feasible
-        - Ask for course recommendations in specific areas
-        - Inquire about prerequisites and requirements
-        """)
-        
-        # Add logout button
-        if st.button("Logout"):
-            st.session_state.authenticated = False
-            st.session_state.messages = []
-            st.rerun()
-            
-        # Add clear chat button
-        if st.button("Clear Chat History"):
-            st.session_state.messages = []
-            thread = client.beta.threads.create()
-            st.rerun()
-
-# Main flow control
-if not st.session_state.authenticated:
-    login_page()
-else:
-    main_app()
+    # Your existing sidebar code...
