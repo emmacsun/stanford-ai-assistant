@@ -1,18 +1,14 @@
 import streamlit as st
 import time
 from openai import OpenAI
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
 
 
 # Use the stored assistant ID in your Streamlit app
 @st.cache_resource
 def initialize_assistant():
-    client = OpenAI(api_key="OPENAI_API_KEY")
+    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
     # Use a stored assistant ID instead of creating new one
-    assistant = client.beta.assistants.retrieve("ASSISTANT_KEY")
+    assistant = client.beta.assistants.retrieve(st.secrets["ASSISTANT_KEY"])
     thread = client.beta.threads.create()
     return client, assistant, thread
 
