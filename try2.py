@@ -16,47 +16,48 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
 # Initialize session state for login
 if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
+   st.session_state.authenticated = False
 
 @st.cache_resource
 def get_google_sheets_service():
     """Initialize Google Sheets service"""
     try:
+        #st.write("🔄 Attempting to connect to Google Sheets...")
         logger.info("Attempting to connect to Google Sheets...")
-        print("Attempting to connect to Google Sheets...")  # Console print
         
         credentials = Credentials.from_service_account_info(
             st.secrets["gcp_service_account"],
             scopes=SCOPES
         )
-        service = build('sheets', 'v4', credentials=credentials)
+        #st.write("✅ Credentials created successfully")
         
-        logger.info("Successfully connected to Google Sheets")
-        print("Successfully connected to Google Sheets")  # Console print
+        service = build('sheets', 'v4', credentials=credentials)
+        #st.write("✅ Service built successfully")
         
         # Test the connection by trying to access the spreadsheet
         spreadsheet_id = st.secrets["SPREADSHEET_ID"]
-        service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+        result = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+        #st.write(f"✅ Successfully accessed spreadsheet: {result.get('properties', {}).get('title')}")
         logger.info(f"Successfully accessed spreadsheet: {spreadsheet_id}")
-        print(f"Successfully accessed spreadsheet: {spreadsheet_id}")  # Console print
         
         return service
     except Exception as e:
-        logger.error(f"Failed to connect to Google Sheets: {str(e)}")
-        print(f"Failed to connect to Google Sheets: {str(e)}")  # Console print
-        st.error(f"Failed to connect to Google Sheets: {str(e)}")
+        error_msg = f"Failed to connect to Google Sheets: {str(e)}"
+        st.error(error_msg)
+        logger.error(error_msg)
         return None
 
 def log_interaction(service, spreadsheet_id, user_message, assistant_response, sunet_id):
     """Log interaction to Google Sheets"""
     if not service:
-        logger.error("Google Sheets service not initialized")
-        print("Google Sheets service not initialized")  # Console print
+        error_msg = "Google Sheets service not initialized"
+        st.error(error_msg)
+        logger.error(error_msg)
         return False
         
     try:
+        #st.write("🔄 Attempting to log interaction...")
         logger.info("Attempting to log interaction...")
-        print("Attempting to log interaction...")  # Console print
         
         # Get PST timezone
         pst = pytz.timezone('America/Los_Angeles')
@@ -74,8 +75,9 @@ def log_interaction(service, spreadsheet_id, user_message, assistant_response, s
             ]
         ]
         
-        # Print the data being logged
-        print(f"Attempting to log row: {row_data}")  # Console print
+        # Show the data being logged
+        #st.write("📝 Logging data:")
+        #st.write({"time": current_time, "user": sunet_id, "msg_length": len(user_message)})
         
         # Append the row to the sheet
         body = {
@@ -90,18 +92,19 @@ def log_interaction(service, spreadsheet_id, user_message, assistant_response, s
             body=body
         ).execute()
         
+        #st.write("✅ Successfully logged interaction to Google Sheets")
         logger.info("Successfully logged interaction to Google Sheets")
-        print("Successfully logged interaction to Google Sheets")  # Console print
         return True
     except Exception as e:
-        logger.error(f"Failed to log interaction: {str(e)}")
-        print(f"Failed to log interaction: {str(e)}")  # Console print
+        error_msg = f"Failed to log interaction: {str(e)}"
+        st.error(error_msg)
+        logger.error(error_msg)
         return False
 
 def initialize_sheet_if_needed(service, spreadsheet_id):
     """Initialize the sheet with headers if it's new"""
     if not service:
-        print("Google Sheets service not initialized")
+        st.error("Google Sheets service not initialized")
         return
         
     try:
@@ -127,9 +130,9 @@ def initialize_sheet_if_needed(service, spreadsheet_id):
                 valueInputOption='RAW',
                 body=body
             ).execute()
-            print("Initialized sheet with headers!")
+            #st.write("✅ Initialized sheet with headers!")
     except Exception as e:
-        print(f"Error checking/initializing sheet: {str(e)}")
+        st.error(f"❌ Error checking/initializing sheet: {str(e)}")
 
 def validate_sunet(sunet_id):
     """
@@ -285,3 +288,21 @@ if not st.session_state.authenticated:
     login_page()
 else:
     main_app()
+    # Temporary test code
+    sheets_service = get_google_sheets_service()
+    if sheets_service:
+        try:
+            spreadsheet_id = st.secrets["SPREADSHEET_ID"]
+            result = sheets_service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+            print("✅ Successfully connected to sheet:", result['properties']['title'])
+            
+            # Try to read the Logs sheet
+            result = sheets_service.spreadsheets().values().get(
+                spreadsheetId=spreadsheet_id,
+                range='Logs!A1:A1'
+            ).execute()
+            #st.write("✅ Successfully accessed 'Logs' sheet")
+        except Exception as e:
+            st.error(f"❌ Error accessing sheet: {str(e)}")
+    else:
+        st.error("❌ Failed to initialize Google Sheets service")
