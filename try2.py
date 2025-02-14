@@ -5,6 +5,11 @@ from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from datetime import datetime
 import pytz
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Google Sheets setup
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
@@ -17,24 +22,42 @@ if "authenticated" not in st.session_state:
 def get_google_sheets_service():
     """Initialize Google Sheets service"""
     try:
+        logger.info("Attempting to connect to Google Sheets...")
+        print("Attempting to connect to Google Sheets...")  # Console print
+        
         credentials = Credentials.from_service_account_info(
             st.secrets["gcp_service_account"],
             scopes=SCOPES
         )
         service = build('sheets', 'v4', credentials=credentials)
-        st.success("Successfully connected to Google Sheets!")
+        
+        logger.info("Successfully connected to Google Sheets")
+        print("Successfully connected to Google Sheets")  # Console print
+        
+        # Test the connection by trying to access the spreadsheet
+        spreadsheet_id = st.secrets["SPREADSHEET_ID"]
+        service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+        logger.info(f"Successfully accessed spreadsheet: {spreadsheet_id}")
+        print(f"Successfully accessed spreadsheet: {spreadsheet_id}")  # Console print
+        
         return service
     except Exception as e:
+        logger.error(f"Failed to connect to Google Sheets: {str(e)}")
+        print(f"Failed to connect to Google Sheets: {str(e)}")  # Console print
         st.error(f"Failed to connect to Google Sheets: {str(e)}")
         return None
 
 def log_interaction(service, spreadsheet_id, user_message, assistant_response, sunet_id):
     """Log interaction to Google Sheets"""
     if not service:
-        st.error("Google Sheets service not initialized")
-        return
+        logger.error("Google Sheets service not initialized")
+        print("Google Sheets service not initialized")  # Console print
+        return False
         
     try:
+        logger.info("Attempting to log interaction...")
+        print("Attempting to log interaction...")  # Console print
+        
         # Get PST timezone
         pst = pytz.timezone('America/Los_Angeles')
         current_time = datetime.now(pst).strftime('%Y-%m-%d %H:%M:%S %Z')
@@ -51,6 +74,9 @@ def log_interaction(service, spreadsheet_id, user_message, assistant_response, s
             ]
         ]
         
+        # Print the data being logged
+        print(f"Attempting to log row: {row_data}")  # Console print
+        
         # Append the row to the sheet
         body = {
             'values': row_data
@@ -64,10 +90,12 @@ def log_interaction(service, spreadsheet_id, user_message, assistant_response, s
             body=body
         ).execute()
         
-        print(f"Successfully logged interaction!")
+        logger.info("Successfully logged interaction to Google Sheets")
+        print("Successfully logged interaction to Google Sheets")  # Console print
         return True
     except Exception as e:
-        print(f"Failed to log interaction: {str(e)}")
+        logger.error(f"Failed to log interaction: {str(e)}")
+        print(f"Failed to log interaction: {str(e)}")  # Console print
         return False
 
 def initialize_sheet_if_needed(service, spreadsheet_id):
