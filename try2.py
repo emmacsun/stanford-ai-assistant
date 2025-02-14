@@ -9,10 +9,13 @@ import pytz
 # Google Sheets setup
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
+# Initialize session state for login
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
 @st.cache_resource
 def get_google_sheets_service():
     """Initialize Google Sheets service"""
-
     try:
         credentials = Credentials.from_service_account_info(
             st.secrets["gcp_service_account"],
@@ -61,16 +64,16 @@ def log_interaction(service, spreadsheet_id, user_message, assistant_response, s
             body=body
         ).execute()
         
-        st.sidebar.success(f"Successfully logged interaction!")
+        print(f"Successfully logged interaction!")
         return True
     except Exception as e:
-        st.sidebar.error(f"Failed to log interaction: {str(e)}")
+        print(f"Failed to log interaction: {str(e)}")
         return False
 
 def initialize_sheet_if_needed(service, spreadsheet_id):
     """Initialize the sheet with headers if it's new"""
     if not service:
-        st.error("Google Sheets service not initialized")
+        print("Google Sheets service not initialized")
         return
         
     try:
@@ -96,9 +99,9 @@ def initialize_sheet_if_needed(service, spreadsheet_id):
                 valueInputOption='RAW',
                 body=body
             ).execute()
-            st.sidebar.success("Initialized sheet with headers!")
+            print("Initialized sheet with headers!")
     except Exception as e:
-        st.sidebar.error(f"Error checking/initializing sheet: {str(e)}")
+        print(f"Error checking/initializing sheet: {str(e)}")
 
 def validate_sunet(sunet_id):
     """
@@ -110,80 +113,37 @@ def validate_sunet(sunet_id):
     # Add more validation rules as needed
     return True
 
-  credentials = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"],
-        scopes=SCOPES
-    )
-    service = build('sheets', 'v4', credentials=credentials)
-    return service
-
-def log_interaction(service, spreadsheet_id, user_message, assistant_response, sunet_id):
-    """Log interaction to Google Sheets"""
-    # Get PST timezone
-    pst = pytz.timezone('America/Los_Angeles')
-    current_time = datetime.now(pst).strftime('%Y-%m-%d %H:%M:%S %Z')
+def login_page():
+    st.title("🎓 Stanford Course Helper Login")
+    st.markdown("Please enter your SUNet ID to access the course helper.")
     
-    # Prepare the row data
-    row_data = [
-        [
-            current_time,
-            sunet_id,
-            user_message,
-            assistant_response,
-            len(user_message),  # Message length
-            len(assistant_response),  # Response length
-        ]
-    ]
-    
-    # Append the row to the sheet
-    body = {
-        'values': row_data
-    }
-    
-    service.spreadsheets().values().append(
-        spreadsheetId=spreadsheet_id,
-        range='Logs!A:F',  # Assumes sheet named 'Logs'
-        valueInputOption='RAW',
-        insertDataOption='INSERT_ROWS',
-        body=body
-    ).execute()
-
-def initialize_sheet_if_needed(service, spreadsheet_id):
-    """Initialize the sheet with headers if it's new"""
-    headers = [
-        ['Timestamp', 'SUNet ID', 'User Message', 'Assistant Response', 
-         'Message Length', 'Response Length']
-    ]
-    
-    try:
-        # Check if headers exist
-        result = service.spreadsheets().values().get(
-            spreadsheetId=spreadsheet_id,
-            range='Logs!A1:F1'
-        ).execute()
+    # Create login form
+    with st.form("login_form"):
+        sunet_id = st.text_input("SUNet ID").strip()
+        submitted = st.form_submit_button("Login")
         
-        if 'values' not in result:
-            # Sheet is empty, add headers
-            body = {
-                'values': headers
-            }
-            service.spreadsheets().values().update(
-                spreadsheetId=spreadsheet_id,
-                range='Logs!A1:F1',
-                valueInputOption='RAW',
-                body=body
-            ).execute()
-    except Exception as e:
-        print(f"Error checking/initializing sheet: {e}")
+        if submitted:
+            if validate_sunet(sunet_id):
+                st.session_state.authenticated = True
+                st.session_state.sunet_id = sunet_id
+                st.rerun()
+            else:
+                st.error("Invalid SUNet ID. Please try again.")
 
-# Modified main_app function
+@st.cache_resource
+def initialize_assistant():
+    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+    assistant = client.beta.assistants.retrieve(st.secrets["ASSISTANT_KEY"])
+    thread = client.beta.threads.create()
+    return client, assistant, thread
+
 def main_app():
     st.title("🎓 Stanford Course Helper")
     
     # Initialize services
     client, assistant, thread = initialize_assistant()
     sheets_service = get_google_sheets_service()
-
+    
     if not sheets_service:
         st.error("Failed to initialize Google Sheets service. Check your credentials.")
         return
@@ -201,9 +161,17 @@ def main_app():
         - Validate your course schedule
         - Provide information about specific courses
     """)
-    st.title("🎓 Stanford Course Helper")
-    # Rest of your existing welcome message code...
     
+    # Create a chat interface
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    # Display chat history
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Chat input
     if prompt := st.chat_input("Ask about courses..."):
         # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
@@ -249,22 +217,6 @@ def main_app():
                     
                     # Log the interaction to Google Sheets
                     success = log_interaction(
-                time.sleep(0.5)
-
-            # Get the response
-            messages = client.beta.threads.messages.list(
-                thread_id=thread.id,
-                order="asc",
-                after=message.id
-            )
-            if messages.data:
-                response = messages.data[0].content[0].text.value
-                message_placeholder.markdown(response)
-                st.session_state.messages.append({"role": "assistant", "content": response})
-                
-                # Log the interaction to Google Sheets
-                try:
-                    log_interaction(
                         sheets_service,
                         spreadsheet_id,
                         prompt,
@@ -305,6 +257,3 @@ if not st.session_state.authenticated:
     login_page()
 else:
     main_app()
-                except Exception as e:
-                    st.error(f"Failed to log interaction: {e}")
-
