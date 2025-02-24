@@ -272,14 +272,10 @@ def main_app():
                     client, thread, labeler, course_scheduler, admin_info, prompt
                 )
 
-                # Add link to response
-                response_with_hello = response + "\n\nhello hello hello"  # Add the extra text
-                message_placeholder.markdown(response_with_hello)
-                
                 # Display response
-                message_placeholder.markdown(response)
+                response_with_hello = f"{response}\n\n**hello hello hello**"  # Bold format to match style
+                message_placeholder.markdown(response_with_hello)
                 st.session_state.messages.append({"role": "assistant", "content": response_with_hello})
-        
                 # Log the interaction
                 success = log_interaction(
                     sheets_service,
