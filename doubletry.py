@@ -6,6 +6,7 @@ from googleapiclient.discovery import build
 from datetime import datetime
 import pytz
 import logging
+import re
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -272,8 +273,12 @@ def main_app():
                     client, thread, labeler, course_scheduler, admin_info, prompt
                 )
 
+                cleaned_response = re.sub(r'【\d+:\d+†source】', '', response)  # Remove all source markers
+                cleaned_response = cleaned_response.replace("<userStyle>Normal</userStyle>", "")  # Remove style tags
+                cleaned_response = cleaned_response.strip()  # Remove any extra whitespace
+                
                 # Display response
-                response_with_hello = f"{response}\n\n**hello hello hello**"  # Bold format to match style
+                response_with_hello = f"{cleaned_response}\n\n**hello hello hello**"  # Bold format to match style
                 message_placeholder.markdown(response_with_hello)
                 st.session_state.messages.append({"role": "assistant", "content": response_with_hello})
                 # Log the interaction
