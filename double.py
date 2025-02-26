@@ -251,63 +251,64 @@ def main_app():
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    # Add the three autofill prompt buttons
-    st.markdown("")
-    col1, col2, col3 = st.columns(3)
-    
-    # Define the prompt texts
-    prompt1 = "What classes should I take as a History major?"
-    prompt2 = "What classes can I take to fulfill WAYS A-II?"
-    prompt3 = "What are some afternoon classes I can take?"
-    
-    # Function to handle button clicks
-    def handle_prompt_click(prompt_text):
-        # Add the prompt to the chat history
-        st.session_state.messages.append({"role": "user", "content": prompt_text})
+    # Only show autofill prompt buttons if chat history is empty
+    if len(st.session_state.messages) == 0:
+        st.markdown("")
+        col1, col2, col3 = st.columns(3)
         
-        # Create new thread for this interaction
-        new_thread = client.beta.threads.create()
+        # Define the prompt texts
+        prompt1 = "What classes should I take as a History major?"
+        prompt2 = "What classes can I take to fulfill WAYS A-II?"
+        prompt3 = "What are some afternoon classes I can take?"
         
-        # Send user's question to labeler
-        client.beta.threads.messages.create(
-            thread_id=new_thread.id,
-            role="user",
-            content=prompt_text
-        )
+        # Function to handle button clicks
+        def handle_prompt_click(prompt_text):
+            # Add the prompt to the chat history
+            st.session_state.messages.append({"role": "user", "content": prompt_text})
+            
+            # Create new thread for this interaction
+            new_thread = client.beta.threads.create()
+            
+            # Send user's question to labeler
+            client.beta.threads.messages.create(
+                thread_id=new_thread.id,
+                role="user",
+                content=prompt_text
+            )
+            
+            # Get labeler's decision
+            label = int(run_assistant(client, new_thread.id, labeler.id))
+            
+            # Choose next assistant based on label
+            next_assistant = course_scheduler if label == 1 else admin_info
+            assistant_type = "Course Scheduler" if label == 1 else "Admin Info"
+            
+            # Get final response from chosen assistant
+            response = run_assistant(client, new_thread.id, next_assistant.id)
+            
+            # Add the response to chat history
+            st.session_state.messages.append({"role": "assistant", "content": response})
+            
+            # Log the interaction
+            log_interaction(
+                sheets_service,
+                spreadsheet_id,
+                prompt_text,
+                response,
+                st.session_state.sunet_id,
+                assistant_type
+            )
+            
+            # Rerun to update UI
+            st.rerun()
         
-        # Get labeler's decision
-        label = int(run_assistant(client, new_thread.id, labeler.id))
-        
-        # Choose next assistant based on label
-        next_assistant = course_scheduler if label == 1 else admin_info
-        assistant_type = "Course Scheduler" if label == 1 else "Admin Info"
-        
-        # Get final response from chosen assistant
-        response = run_assistant(client, new_thread.id, next_assistant.id)
-        
-        # Add the response to chat history
-        st.session_state.messages.append({"role": "assistant", "content": response})
-        
-        # Log the interaction
-        log_interaction(
-            sheets_service,
-            spreadsheet_id,
-            prompt_text,
-            response,
-            st.session_state.sunet_id,
-            assistant_type
-        )
-        
-        # Rerun to update UI
-        st.rerun()
-    
-    # Create the buttons
-    if col1.button(prompt1):
-        handle_prompt_click(prompt1)
-    if col2.button(prompt2):
-        handle_prompt_click(prompt2)
-    if col3.button(prompt3):
-        handle_prompt_click(prompt3)
+        # Create the buttons
+        if col1.button(prompt1):
+            handle_prompt_click(prompt1)
+        if col2.button(prompt2):
+            handle_prompt_click(prompt2)
+        if col3.button(prompt3):
+            handle_prompt_click(prompt3)
 
     # Chat input for regular user typing
     user_input = st.chat_input("Ask about courses...")
