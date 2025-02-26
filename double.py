@@ -128,7 +128,7 @@ def validate_sunet(sunet_id):
     return True;
 
 def login_page():
-    st.title("🎓 Stanford AI Academic Advisor")
+    st.title("🧝🏼‍♀️ Ask Athena")
     st.markdown("Please enter your SUNet ID to access Athena. (Ex. jsmith).")
 
     with st.form("login_form"):
