@@ -38,17 +38,15 @@ def get_google_sheets_service():
 
         return service
     except Exception as e:
-        error_msg = f"Failed to connect to Google Sheets: {str(e)}"
-        st.error(error_msg)
-        logger.error(error_msg)
+        # Log the error to the console but don't display it to the user
+        logger.error(f"Failed to connect to Google Sheets: {str(e)}")
         return None
 
 def log_interaction(service, spreadsheet_id, user_message, assistant_response, sunet_id, assistant_type):
     """Log interaction to Google Sheets with assistant type"""
     if not service:
-        error_msg = "Google Sheets service not initialized"
-        st.error(error_msg)
-        logger.error(error_msg)
+        # Silently fail without showing errors to user
+        logger.error("Google Sheets service not initialized")
         return False
 
     try:
@@ -87,15 +85,15 @@ def log_interaction(service, spreadsheet_id, user_message, assistant_response, s
         logger.info("Successfully logged interaction to Google Sheets")
         return True
     except Exception as e:
-        error_msg = f"Failed to log interaction: {str(e)}"
-        st.error(error_msg)
-        logger.error(error_msg)
+        # Log the error but don't display it to the user
+        logger.error(f"Failed to log interaction: {str(e)}")
         return False
 
 def initialize_sheet_if_needed(service, spreadsheet_id):
     """Initialize the sheet with headers if it's new"""
     if not service:
-        st.error("Google Sheets service not initialized")
+        # Skip silently if service is not available
+        logger.error("Google Sheets service not initialized")
         return
 
     try:
@@ -122,7 +120,8 @@ def initialize_sheet_if_needed(service, spreadsheet_id):
                 body=body
             ).execute()
     except Exception as e:
-        st.error(f"❌ Error checking/initializing sheet: {str(e)}")
+        # Log error but don't display to user
+        logger.error(f"Error checking/initializing sheet: {str(e)}")
 
 def validate_sunet(sunet_id):
     """Validate SUNet ID format"""
@@ -231,10 +230,8 @@ def main_app():
     sheets_service = get_google_sheets_service()
     spreadsheet_id = st.secrets.get("SPREADSHEET_ID", "")
 
-    # Show warning instead of error, and continue with the app
-    if not sheets_service:
-        st.sidebar.warning("⚠️ Google Sheets logging is not available. Chat functionality will still work, but interactions won't be logged.")
-    else:
+    # No warning displayed if Google Sheets fails
+    if sheets_service:
         # Initialize sheet if needed
         initialize_sheet_if_needed(sheets_service, spreadsheet_id)
 
@@ -339,7 +336,7 @@ def main_app():
 
                 # Only log the interaction if Google Sheets service is available
                 if sheets_service:
-                    success = log_interaction(
+                    log_interaction(
                         sheets_service,
                         spreadsheet_id,
                         user_input,
@@ -347,9 +344,6 @@ def main_app():
                         st.session_state.sunet_id,
                         assistant_type
                     )
-                    
-                    if not success:
-                        st.sidebar.info("Note: This interaction was not logged due to a Google Sheets error.")
 
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
