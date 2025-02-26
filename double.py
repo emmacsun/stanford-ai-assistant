@@ -237,7 +237,7 @@ def main_app():
 
     # Display welcome message
     st.markdown(f"""
-        Hello from your AI academic advisor, {st.session_state.sunet_id}! 
+        Hi {st.session_state.sunet_id}! I am your AI academic advisor. Sometimes I need to think harder about my responses, so please give me about 20 seconds.
     """)
 
     # Initialize chat history
