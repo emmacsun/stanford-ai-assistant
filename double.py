@@ -222,7 +222,7 @@ def process_user_query(client, thread, labeler, course_scheduler, admin_info, us
         return error_msg, "Error"
 
 def main_app():
-    st.title("Ask Athena")
+    st.title("🧝🏼‍♀️Ask Athena")
     
     # Initialize services
     client, labeler, course_scheduler, admin_info, thread = initialize_assistants()
