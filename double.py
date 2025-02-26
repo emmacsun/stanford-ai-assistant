@@ -252,12 +252,12 @@ def main_app():
             st.markdown(message["content"])
 
     # Add the three autofill prompt buttons
-    st.markdown("### Quick Questions:")
+    st.markdown("")
     col1, col2, col3 = st.columns(3)
     
     # Define the prompt texts
     prompt1 = "What classes should I take as a History major?"
-    prompt2 = "What classes fulfill WAYS A-II?"
+    prompt2 = "What classes can I take to fulfill WAYS A-II?"
     prompt3 = "What are some afternoon classes I can take?"
     
     # Function to handle button clicks
