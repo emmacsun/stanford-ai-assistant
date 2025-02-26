@@ -226,16 +226,17 @@ def main_app():
 
     # Initialize services
     client, labeler, course_scheduler, admin_info, thread = initialize_assistants()
+    
+    # Try to initialize Google Sheets, but continue even if it fails
     sheets_service = get_google_sheets_service()
+    spreadsheet_id = st.secrets.get("SPREADSHEET_ID", "")
 
+    # Show warning instead of error, and continue with the app
     if not sheets_service:
-        st.error("Failed to initialize Google Sheets service. Check your credentials.")
-        return
-
-    spreadsheet_id = st.secrets["SPREADSHEET_ID"]
-
-    # Initialize sheet if needed
-    initialize_sheet_if_needed(sheets_service, spreadsheet_id)
+        st.sidebar.warning("⚠️ Google Sheets logging is not available. Chat functionality will still work, but interactions won't be logged.")
+    else:
+        # Initialize sheet if needed
+        initialize_sheet_if_needed(sheets_service, spreadsheet_id)
 
     # Display welcome message
     st.markdown(f"""
@@ -290,15 +291,16 @@ def main_app():
             # Add the response to chat history
             st.session_state.messages.append({"role": "assistant", "content": response})
             
-            # Log the interaction
-            log_interaction(
-                sheets_service,
-                spreadsheet_id,
-                prompt_text,
-                response,
-                st.session_state.sunet_id,
-                assistant_type
-            )
+            # Only log the interaction if Google Sheets service is available
+            if sheets_service:
+                log_interaction(
+                    sheets_service,
+                    spreadsheet_id,
+                    prompt_text,
+                    response,
+                    st.session_state.sunet_id,
+                    assistant_type
+                )
             
             # Rerun to update UI
             st.rerun()
@@ -335,18 +337,19 @@ def main_app():
                 message_placeholder.markdown(response)
                 st.session_state.messages.append({"role": "assistant", "content": response})
 
-                # Log the interaction
-                success = log_interaction(
-                    sheets_service,
-                    spreadsheet_id,
-                    user_input,
-                    response,
-                    st.session_state.sunet_id,
-                    assistant_type
-                )
-
-                if not success:
-                    st.sidebar.warning("Failed to log this interaction. Please check the errors above.")
+                # Only log the interaction if Google Sheets service is available
+                if sheets_service:
+                    success = log_interaction(
+                        sheets_service,
+                        spreadsheet_id,
+                        user_input,
+                        response,
+                        st.session_state.sunet_id,
+                        assistant_type
+                    )
+                    
+                    if not success:
+                        st.sidebar.info("Note: This interaction was not logged due to a Google Sheets error.")
 
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
