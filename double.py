@@ -221,8 +221,6 @@ def process_user_query(client, thread, labeler, course_scheduler, admin_info, us
         logger.error(error_msg)
         return error_msg, "Error"
 
-# We don't need this function anymore with our new implementation
-
 def main_app():
     st.title("🧝🏼‍♀️ Ask Athena")
     
@@ -253,39 +251,73 @@ def main_app():
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    # Initialize prompt state if not exists
-    if "prompt" not in st.session_state:
-        st.session_state.prompt = ""
-    
     # Add the three autofill prompt buttons
     st.markdown("### Quick Questions:")
     col1, col2, col3 = st.columns(3)
-    with col1:
-        st.button("What classes should I take as a History major?", 
-                  on_click=set_prompt, 
-                  args=["What classes should I take as a History major?"])
-    with col2:
-        st.button("What classes fulfill WAYS A-II?", 
-                  on_click=set_prompt, 
-                  args=["What classes fulfill WAYS A-II?"])
-    with col3:
-        st.button("What are some afternoon classes I can take?", 
-                  on_click=set_prompt, 
-                  args=["What are some afternoon classes I can take?"])
-
-    # Chat input (note: chat_input doesn't accept a value parameter)
-    prompt = st.chat_input("Ask about courses...")
     
-    # Clear the prompt state after it's been used
-    if prompt:
-        # If prompt came from button, clear it for next use
-        if prompt == st.session_state.prompt:
-            st.session_state.prompt = ""
-            
+    # Define the prompt texts
+    prompt1 = "What classes should I take as a History major?"
+    prompt2 = "What classes fulfill WAYS A-II?"
+    prompt3 = "What are some afternoon classes I can take?"
+    
+    # Function to handle button clicks
+    def handle_prompt_click(prompt_text):
+        # Add the prompt to the chat history
+        st.session_state.messages.append({"role": "user", "content": prompt_text})
+        
+        # Create new thread for this interaction
+        new_thread = client.beta.threads.create()
+        
+        # Send user's question to labeler
+        client.beta.threads.messages.create(
+            thread_id=new_thread.id,
+            role="user",
+            content=prompt_text
+        )
+        
+        # Get labeler's decision
+        label = int(run_assistant(client, new_thread.id, labeler.id))
+        
+        # Choose next assistant based on label
+        next_assistant = course_scheduler if label == 1 else admin_info
+        assistant_type = "Course Scheduler" if label == 1 else "Admin Info"
+        
+        # Get final response from chosen assistant
+        response = run_assistant(client, new_thread.id, next_assistant.id)
+        
+        # Add the response to chat history
+        st.session_state.messages.append({"role": "assistant", "content": response})
+        
+        # Log the interaction
+        log_interaction(
+            sheets_service,
+            spreadsheet_id,
+            prompt_text,
+            response,
+            st.session_state.sunet_id,
+            assistant_type
+        )
+        
+        # Rerun to update UI
+        st.rerun()
+    
+    # Create the buttons
+    if col1.button(prompt1):
+        handle_prompt_click(prompt1)
+    if col2.button(prompt2):
+        handle_prompt_click(prompt2)
+    if col3.button(prompt3):
+        handle_prompt_click(prompt3)
+
+    # Chat input for regular user typing
+    user_input = st.chat_input("Ask about courses...")
+    
+    # Process regular user input
+    if user_input:
         # Add user message to chat history
-        st.session_state.messages.append({"role": "user", "content": prompt})
+        st.session_state.messages.append({"role": "user", "content": user_input})
         with st.chat_message("user"):
-            st.markdown(prompt)
+            st.markdown(user_input)
 
         # Create assistant response
         with st.chat_message("assistant"):
@@ -294,7 +326,7 @@ def main_app():
             try:
                 # Process through dual assistant system
                 response, assistant_type = process_user_query(
-                    client, thread, labeler, course_scheduler, admin_info, prompt
+                    client, thread, labeler, course_scheduler, admin_info, user_input
                 )
                 
                 # Display response
@@ -305,7 +337,7 @@ def main_app():
                 success = log_interaction(
                     sheets_service,
                     spreadsheet_id,
-                    prompt,
+                    user_input,
                     response,
                     st.session_state.sunet_id,
                     assistant_type
