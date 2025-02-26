@@ -221,9 +221,7 @@ def process_user_query(client, thread, labeler, course_scheduler, admin_info, us
         logger.error(error_msg)
         return error_msg, "Error"
 
-# Function to handle prompt button clicks
-def set_prompt(prompt_text):
-    st.session_state.prompt = prompt_text
+# We don't need this function anymore with our new implementation
 
 def main_app():
     st.title("🧝🏼‍♀️ Ask Athena")
@@ -275,8 +273,8 @@ def main_app():
                   on_click=set_prompt, 
                   args=["What are some afternoon classes I can take?"])
 
-    # Chat input with pre-filled text from buttons if available
-    prompt = st.chat_input("Ask about courses...", value=st.session_state.prompt)
+    # Chat input (note: chat_input doesn't accept a value parameter)
+    prompt = st.chat_input("Ask about courses...")
     
     # Clear the prompt state after it's been used
     if prompt:
