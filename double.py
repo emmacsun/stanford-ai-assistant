@@ -221,6 +221,10 @@ def process_user_query(client, thread, labeler, course_scheduler, admin_info, us
         logger.error(error_msg)
         return error_msg, "Error"
 
+# Function to handle prompt button clicks
+def set_prompt(prompt_text):
+    st.session_state.prompt = prompt_text
+
 def main_app():
     st.title("🧝🏼‍♀️ Ask Athena")
     
@@ -251,8 +255,35 @@ def main_app():
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    # Chat input
-    if prompt := st.chat_input("Ask about courses..."):
+    # Initialize prompt state if not exists
+    if "prompt" not in st.session_state:
+        st.session_state.prompt = ""
+    
+    # Add the three autofill prompt buttons
+    st.markdown("### Quick Questions:")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.button("What classes should I take as a History major?", 
+                  on_click=set_prompt, 
+                  args=["What classes should I take as a History major?"])
+    with col2:
+        st.button("What classes fulfill WAYS A-II?", 
+                  on_click=set_prompt, 
+                  args=["What classes fulfill WAYS A-II?"])
+    with col3:
+        st.button("What are some afternoon classes I can take?", 
+                  on_click=set_prompt, 
+                  args=["What are some afternoon classes I can take?"])
+
+    # Chat input with pre-filled text from buttons if available
+    prompt = st.chat_input("Ask about courses...", value=st.session_state.prompt)
+    
+    # Clear the prompt state after it's been used
+    if prompt:
+        # If prompt came from button, clear it for next use
+        if prompt == st.session_state.prompt:
+            st.session_state.prompt = ""
+            
         # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
