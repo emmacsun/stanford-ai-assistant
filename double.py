@@ -246,9 +246,9 @@ def main_app():
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # Display chat history
+    # Display chat history with custom emoji avatars
     for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
+        with st.chat_message(message["role"], avatar="👨‍🎓" if message["role"] == "user" else "🧝🏼‍♀️"):
             st.markdown(message["content"])
 
     # Only show autofill prompt buttons if chat history is empty
@@ -317,11 +317,11 @@ def main_app():
     if user_input:
         # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": user_input})
-        with st.chat_message("user"):
+        with st.chat_message("user", avatar="👨‍🎓"):
             st.markdown(user_input)
 
         # Create assistant response
-        with st.chat_message("assistant"):
+        with st.chat_message("assistant", avatar="🧝🏼‍♀️"):
             message_placeholder = st.empty()
             
             try:
