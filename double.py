@@ -129,8 +129,8 @@ def validate_sunet(sunet_id):
     return True;
 
 def login_page():
-    st.title("🎓 Stanford Course Helper Login")
-    st.markdown("Please enter your SUNet ID to access the course helper.")
+    st.title("🎓 Stanford AI Academic Advisor")
+    st.markdown("Please enter your SUNet ID to access Athena. (Ex. jsmith).")
     
     with st.form("login_form"):
         sunet_id = st.text_input("SUNet ID").strip()
@@ -222,7 +222,7 @@ def process_user_query(client, thread, labeler, course_scheduler, admin_info, us
         return error_msg, "Error"
 
 def main_app():
-    st.title("🎓 Stanford Course Helper")
+    st.title("Ask Athena)
     
     # Initialize services
     client, labeler, course_scheduler, admin_info, thread = initialize_assistants()
@@ -239,11 +239,7 @@ def main_app():
     
     # Display welcome message
     st.markdown(f"""
-        Welcome to the Stanford Course Helper, {st.session_state.sunet_id}! I can help you:
-        - Check course prerequisites
-        - Recommend courses based on your interests
-        - Validate your course schedule
-        - Provide information about specific courses
+        Hello from your AI academic advisor, {st.session_state.sunet_id}! 
     """)
     
     # Initialize chat history
