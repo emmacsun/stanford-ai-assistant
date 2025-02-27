@@ -129,7 +129,7 @@ def validate_sunet(sunet_id):
 
 def login_page():
     st.title("🧝🏼‍♀️ Ask Athena")
-    st.markdown("Please enter your SUNet ID to access Athena. (Ex. jsmith).")
+    st.markdown("Please enter your Stanford email to access Athena. (Ex. jsmith@stanford.edu).")
 
     with st.form("login_form"):
         sunet_id = st.text_input("SUNet ID").strip()
